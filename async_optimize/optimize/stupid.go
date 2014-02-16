@@ -13,15 +13,14 @@ type Ans struct {
 }
 
 // Stupid is an optimizer which finds the objective of the function through iterative
-// guess and check. It assumes that each dimension is bounded between 0 and 1
+// guess and check.
 type Stupid struct {
 	// Fields beginning with capital letters are public
 
-	MaxFunEvals int // Maximum number of allowed
+	MaxFunEvals int // Maximum number of allowed function evaluations
 	NumDim      int // Dimension of the problem
 
 	// Fields beginning with lower-case letters are private
-	nDim    int
 	bestObj float64
 	bestLoc []float64
 }
@@ -30,35 +29,35 @@ type Stupid struct {
 // allocates memory for the best location
 // This is a method definition for the SimpleIterative type. It requires pointer
 // receiver
-func (simple *Stupid) init(nDim int) {
+func (stupid *Stupid) init() {
 	// In go, when a value is created, it is initialized to its zero value. For
 	// float64 types this is 0.
-	simple.bestObj = math.Inf(1)
+	stupid.bestObj = math.Inf(1)
 	// There are  a few special "reference" types in go that need to be allocated
 	// with make. A "slice", similar to a dynamic array, is one of them. This
 	// creates a slice of nDim doubles
-	simple.bestLoc = make([]float64, simple.NumDim)
+	stupid.bestLoc = make([]float64, stupid.NumDim)
 }
 
-func (simple *Stupid) Optimize(fun func(loc []float64) float64) Ans {
+func (stupid *Stupid) Optimize(fun func(loc []float64) float64) Ans {
 	// Call the initialization
-	simple.init(simple.NumDim)
+	stupid.init()
 	// Create some memory for the new location
-	xNext := make([]float64, simple.NumDim)
+	xNext := make([]float64, stupid.NumDim)
 	// Guess and check MaxFunEvals number of times
-	for i := 0; i < simple.MaxFunEvals; i++ {
+	for i := 0; i < stupid.MaxFunEvals; i++ {
 		// Get a new random location
 		for j := range xNext {
-			xNext[j] = rand.Float64()
+			xNext[j] = rand.NormFloat64()
 		}
 
 		// Evaluate the objective function
 		f := fun(xNext)
 
 		// See if it's better, and if so, update the best point
-		if f < simple.bestObj {
-			simple.bestObj = f
-			copy(simple.bestLoc, xNext)
+		if f < stupid.bestObj {
+			stupid.bestObj = f
+			copy(stupid.bestLoc, xNext)
 		}
 	}
 	// Return the best location found
@@ -68,5 +67,5 @@ func (simple *Stupid) Optimize(fun func(loc []float64) float64) Ans {
 	//		&StructType{}
 	// creates a new value of StructType and takes its reference.
 	// You can also specify fields in a struct literal.
-	return Ans{Loc: simple.bestLoc, Obj: simple.bestObj}
+	return Ans{Loc: stupid.bestLoc, Obj: stupid.bestObj}
 }
