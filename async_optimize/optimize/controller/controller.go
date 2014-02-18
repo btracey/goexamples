@@ -120,6 +120,7 @@ type AsyncAvoid struct {
 // Init initializes the memory and launches the concurrent process
 func (avoid *AsyncAvoid) Init(nDim int) {
 	avoid.x = make([]float64, nDim)
+	avoid.bestloc = make([]float64, nDim)
 	avoid.quit = make(chan bool)
 	avoid.next = make(chan []float64)
 	avoid.nextback = make(chan []float64)
@@ -147,7 +148,13 @@ OuterFor:
 	for {
 		select {
 		case x := <-avoid.next:
+			if math.IsInf(avoid.bestdist, -1) {
+				avoid.search()
+			}
+
 			copy(x, avoid.bestloc)
+			// Need to reset the distance so we find a new point
+			avoid.bestdist = math.Inf(-1)
 			avoid.nextback <- x
 		case <-avoid.quit:
 			break OuterFor

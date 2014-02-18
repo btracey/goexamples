@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/btracey/goexamples/async_optimize/functions"
@@ -18,6 +19,17 @@ func main() {
 	runtime.GOMAXPROCS(nCpu)
 	rand.Seed(time.Now().UnixNano())
 
+	nWorkers := 3
+
+	workers := make([]optimize.Worker, nWorkers)
+	for i := range workers {
+		workers[i] = &optimize.RemoteWorker{
+			Output: true,
+			Port:   ":" + strconv.Itoa(2000+i),
+			Id:     i,
+		}
+	}
+
 	control := &controller.AsyncAvoid{}
 
 	objer := functions.Varied{
@@ -25,23 +37,11 @@ func main() {
 		Varied: 3500 * time.Millisecond,
 	}
 
-	/*
-			fun := &functions.Remote{
-				Location: port,
-				Objer:    objer,
-			}
-
-			err := fun.Init()
-		if err != nil {
-			panic(err)
-		}
-	*/
-
 	optimizer := &optimize.Async{
-		MaxFunEvals:   25,
-		NumDim:        2,
-		NumConcurrent: nCpu - 1,
-		PrintReturns:  true,
+		MaxFunEvals:  25,
+		NumDim:       2,
+		Workers:      workers,
+		PrintReturns: true,
 
 		Controller: control,
 	}

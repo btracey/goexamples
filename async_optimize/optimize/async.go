@@ -27,10 +27,9 @@ import (
 // no other goroutine can send on the channel (aka there is a deadlock condition)
 // the go runtime will panic.
 
-// worker is a type which reads in a request for a new location to evaluate,
-// it evaluates that location, and then returns the answer on the write channel
-type worker struct {
-
+// A LocalWorker is a worker which concurrently executes an objective function locally
+// (within shared memory)
+type LocalWorker struct {
 	// To help with code legibility and safety, channels can also be read-only
 	// <-chan, or write-only chan<-. Channels are always created as being neither,
 	// but can be assigned. In this worker struct, the worker is not allowed to
@@ -41,16 +40,23 @@ type worker struct {
 	write chan<- Ans       // channel for returning the evaulated objectives
 
 	fun Objer // objective function
-	id  int   // ID of the worker
+	Id  int   // ID of the worker
 
-	output bool
+	Output bool
 	quit   <-chan bool // Channel to signal closure of the goroutine upon completion
 }
 
+func (l *LocalWorker) Init(read <-chan []float64, write chan<- Ans, fun Objer, quit <-chan bool) {
+	l.read = read
+	l.write = write
+	l.fun = fun
+	l.quit = quit
+}
+
 // Run runs the worker
-func (w worker) run() {
-	if w.output {
-		fmt.Printf("worker %d launched\n", w.id)
+func (w *LocalWorker) Run() {
+	if w.Output {
+		fmt.Printf("worker %d launched\n", w.Id)
 	}
 OuterLoop:
 	// Continue looking for function calls to execute until told to quit
@@ -68,17 +74,23 @@ OuterLoop:
 			// send the answer back
 			obj := w.fun.Obj(x)
 			w.write <- Ans{Loc: x, Obj: obj}
-			if w.output {
-				fmt.Printf("worker %d finished running\n", w.id)
+			if w.Output {
+				fmt.Printf("worker %d finished running\n", w.Id)
 			}
 		case <-w.quit:
 			// If read from the quit channel, break out of the loop
 			break OuterLoop
 		}
 	}
-	if w.output {
-		fmt.Printf("worker %d quit\n", w.id)
+	if w.Output {
+		fmt.Printf("worker %d quit\n", w.Id)
 	}
+}
+
+// A Worker is control device for the concurrent evaluation of an objective function
+type Worker interface {
+	Init(read <-chan []float64, write chan<- Ans, fun Objer, quit <-chan bool)
+	Run() // Launches the process
 }
 
 // Async is an optimizer which makes concurrent calls to the objective function
@@ -86,10 +98,12 @@ OuterLoop:
 type Async struct {
 	MaxFunEvals   int // Maximum number of allowed function evaluations
 	NumDim        int // Dimension of the problem
-	NumConcurrent int // How many to evaluate concurrently
+	numConcurrent int // How many to evaluate concurrently
 	PrintReturns  bool
 
 	Controller controller.C // Controller for the next function location to evaluate
+
+	Workers []Worker
 
 	bestObj float64
 	bestLoc []float64
@@ -102,6 +116,7 @@ type Async struct {
 }
 
 func (async *Async) init() {
+	async.numConcurrent = len(async.Workers)
 	// Allocate memory
 	async.bestObj = math.Inf(1)
 	async.bestLoc = make([]float64, async.NumDim)
@@ -115,20 +130,12 @@ func (async *Async) init() {
 	async.fromWorker = fromWorker
 	async.quitWorker = quit
 
-	// Launch all of the workers
-	for i := 0; i < async.NumConcurrent; i++ {
-		// This defines a function literal and launches it concurrently
-		go func(i int) {
-			w := &worker{
-				read:   toWorker,
-				write:  fromWorker,
-				fun:    async.fun,
-				id:     i,
-				output: async.PrintReturns,
-				quit:   quit,
-			}
-			w.run()
-		}(i)
+	for _, worker := range async.Workers {
+		go func(worker Worker) {
+			worker.Init(toWorker, fromWorker, async.fun, quit)
+
+			worker.Run()
+		}(worker)
 	}
 }
 
@@ -151,8 +158,8 @@ func (async *Async) Optimize(fun Objer) (Ans, error) {
 	if async.MaxFunEvals <= 0 {
 		return Ans{}, errors.New("async: MaxFunEvals non-positive")
 	}
-	if async.NumConcurrent <= 0 {
-		return Ans{}, errors.New("async: NumConcurrent non-positive")
+	if len(async.Workers) == 0 {
+		return Ans{}, errors.New("async: Length of workers is zero")
 	}
 
 	async.fun = fun
@@ -167,13 +174,13 @@ func (async *Async) Optimize(fun Objer) (Ans, error) {
 	nDim := async.NumDim
 
 	// Give an initial function to each worker
-	for i := 0; i < async.NumConcurrent; i++ {
+	for i := 0; i < async.numConcurrent; i++ {
 		xnext := make([]float64, nDim)
 		async.Controller.Next(xnext)
 		async.toWorker <- xnext // The workers are executing concurrently and will read from the channel
 	}
 	// That's it!
-	nFunEvals := async.NumConcurrent
+	nFunEvals := async.numConcurrent
 	for nFunEvals < async.MaxFunEvals {
 		// Wait to read from a solution
 		ans := <-async.fromWorker
@@ -191,7 +198,7 @@ func (async *Async) Optimize(fun Objer) (Ans, error) {
 		nFunEvals++
 	}
 	// Read the final returns from the workers
-	for i := 0; i < async.NumConcurrent; i++ {
+	for i := 0; i < async.numConcurrent; i++ {
 		ans := <-async.fromWorker
 		async.Controller.Add(ans.Loc, ans.Obj)
 		async.updateBest(ans)

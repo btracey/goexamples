@@ -31,7 +31,7 @@ func main() {
 	//		optimizer = optimize.Stupid{...}
 	optimizer := &optimize.Stupid{
 		MaxFunEvals: 100000,
-		NumDim:      15,
+		NumDim:      150,
 	}
 
 	// Set the random number seed

@@ -45,6 +45,12 @@ func main() {
 	runtime.GOMAXPROCS(nCpu)
 	rand.Seed(time.Now().UnixNano())
 
+	NumConcurrent := nCpu - 1
+	workers := make([]optimize.Worker, NumConcurrent)
+	for i := range workers {
+		workers[i] = &optimize.LocalWorker{Id: i, Output: true}
+	}
+
 	// Set up the optimization run
 
 	//control := controller.Simple{}
@@ -56,17 +62,17 @@ func main() {
 		Varied: 3500 * time.Millisecond,
 	}
 	optimizer := &optimize.Async{
-		MaxFunEvals:   25,
-		NumDim:        2,
-		NumConcurrent: nCpu - 1,
-		PrintReturns:  true,
+		MaxFunEvals:  25,
+		NumDim:       2,
+		PrintReturns: true,
+		Workers:      workers,
 
 		Controller: control,
 	}
 
 	ans, err := optimizer.Optimize(objer)
 	if err != nil {
-		fmt.Println("Error optimizing ")
+		fmt.Println("Error optimizing ", err)
 	}
 	fmt.Println("Optimization finished\nBest location is", ans.Loc, "\nBest value is ", ans.Obj)
 }

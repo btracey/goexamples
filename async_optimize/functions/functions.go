@@ -3,6 +3,7 @@ package functions
 import (
 	"encoding/gob"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"net"
@@ -59,7 +60,7 @@ type Remote struct {
 	conn  net.Conn
 	enc   *gob.Encoder
 	dec   *gob.Decoder
-	b     []byte
+	//b     []byte
 }
 
 func (r *Remote) Init() error {
@@ -78,14 +79,10 @@ func (r *Remote) Init() error {
 		return err
 	}
 	r.enc = enc
-
-	//r.b = make([]byte, r.BufferSize)
 	return nil
 }
 
 func (r *Remote) Obj(x []float64) float64 {
-
-	fmt.Println("x is ", x)
 	// Serialize and send the location
 	err := r.enc.Encode(x)
 	if err != nil {
@@ -127,18 +124,6 @@ func (r *RemoteReceiver) Do() {
 	}
 	r.conn = conn
 
-	//size := 5000
-
-	/*
-		// Wait for the objer
-		buf := make([]byte, 5000)
-		n, err := conn.Read(buf)
-		if err != nil {
-			panic(err)
-		}
-		buf = buf[0:n]
-	*/
-
 	// Deserialize the objer
 	enc := gob.NewEncoder(conn)
 	dec := gob.NewDecoder(conn)
@@ -150,16 +135,16 @@ func (r *RemoteReceiver) Do() {
 	x := make([]float64, 0)
 	// Now, continue waiting to receive new locations
 	for {
-		// Reexpand buffer
-		//buf = buf[0:size]
-
 		// Read the new location
 		err = dec.Decode(&x)
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println("x is ", x)
+		fmt.Println("received x of ", x)
 
 		ans := r.obj.Obj(x)
 		err = enc.Encode(ans)

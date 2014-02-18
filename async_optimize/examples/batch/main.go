@@ -55,30 +55,30 @@ func main() {
 	runtime.GOMAXPROCS(nCpu)
 
 	// Simple case
-
-	objer := Example{}
-	optimizer := &optimize.Batch{
-		MaxFunEvals: 10000,
-		NumDim:      15,
-		BatchSize:   nCpu, // Set to be one per Cpu
-	}
-
 	/*
-		// With a varied objective function
-		objer := Varied{
-			Fixed:  time.Second,
-			Varied: 3500 * time.Millisecond,
-		}
+		objer := Example{}
 		optimizer := &optimize.Batch{
-			MaxFunEvals:    100,
-			NumDim:         15,
-			BatchSize:      nCpu, // Set to be one per Cpu
-			PrintBatchTime: true,
+			MaxFunEvals: 10000,
+			NumDim:      15,
+			BatchSize:   nCpu, // Set to be one per Cpu
 		}
-		// Note that even though many of the runs take just over 1 second, the whole
-		// iteration needs to pause until the last one is finished. This is a waste
-		// of many processor hours
 	*/
+
+	// With a varied objective function
+	objer := Varied{
+		Fixed:  time.Second,
+		Varied: 3500 * time.Millisecond,
+	}
+	optimizer := &optimize.Batch{
+		MaxFunEvals:    100,
+		NumDim:         15,
+		BatchSize:      nCpu, // Set to be one per Cpu
+		PrintBatchTime: true,
+	}
+	// Note that even though many of the runs take just over 1 second, the whole
+	// iteration needs to pause until the last one is finished. This is a waste
+	// of many processor hours
+
 	/*
 		// Concurrency is hard. Race conditions can happen and are bad. Fortunately,
 		// go has a race detector! go install -race
