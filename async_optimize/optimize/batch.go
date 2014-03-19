@@ -96,8 +96,8 @@ func (batch *Batch) Optimize(fun Objer) (Ans, error) {
 		f := func(i int) {
 			// guess a random location
 			x := make([]float64, batch.NumDim)
-			for i := range x {
-				x[i] = rand.NormFloat64()
+			for j := range x {
+				x[j] = rand.NormFloat64()
 			}
 			// Evaluate the objective function
 			obj := fun.Obj(x)
